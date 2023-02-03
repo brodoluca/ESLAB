@@ -15,7 +15,7 @@ class configureCamera:
 	out_path ='./image_test.jpg'
 	camera_width=640 #1280x720 or 640x360
 	camera_height=360 #720 
-	def __init__(self, camera_resource=0):
+	def __init__(self, camera_resource=10):
 		self.__camera_resource = camera_resource
 		
 		

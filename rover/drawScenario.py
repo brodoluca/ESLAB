@@ -144,6 +144,7 @@ class Targets():
 	def set_target_list(self,targets_scenario, game_mode="bottom"):
 		#call game mode
 		targets_scenario=self.define_mode(targets_scenario,game_mode)
+	
 		print ("game mode:",targets_scenario,game_mode)
 		if targets_scenario:
 			count=0

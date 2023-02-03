@@ -3,7 +3,7 @@ import  cv2
 import time
 import itertools
 SHOW_ASTAR = False
-ROOM_OVER_OBSTACLE = 30
+ROOM_OVER_OBSTACLE = 90
 WIDTH_OBSTACLE = 42
 HEIGHT_OBSTACLE = 90.0
 class Node():
@@ -38,9 +38,10 @@ def intersect(p1, p2, p3, p4):
     x = x1 + ua * (x2-x1)
     y = y1 + ua * (y2-y1)
     return (x,y)
-
+import math
 
 class PathFinder():
+    
     def __init__(self, maze,start,end_points, obstacles):
         self.__maze = maze
         self.start = start
@@ -48,9 +49,10 @@ class PathFinder():
         self.__solver = self.astar
         self.__obsta = obstacles
         self.solved = False
+        
         #print(self.__obsta)
     def __map_to_real_world(self,value):
-        return float(value)*(1.30) / float(480)
+        return round(float(value)*(1.30) / float(480),3)
 
     def __get_ordered_list(self,points, x, y, reverse = False):
         points.sort(key = lambda p: (p[0] - x)**2 + (p[1] - y)**2, reverse = reverse)
@@ -67,12 +69,14 @@ class PathFinder():
              else:
                  start_point = self.end_points[path_number-1]
              for direction_point in direction_points[path_number]:
-                        distance = np.sqrt(np.sum(np.square(np.asarray(start_point) - np.asarray(direction_point ))))
+                        #prdistance = np.sqrt(np.sum(np.square(np.asarray(start_point) - np.asarray(direction_point ))))
+                        distance = np.linalg.norm(np.asarray(start_point)- np.asarray(direction_point))
                         distance = self.__map_to_real_world(distance)
                         angle = np.arctan2((start_point[1] - direction_point[1]) ,( start_point[0] -direction_point[0])) #we are using x and y inverted, so we have to invert them again for real word
                         angle = (angle+np.pi/2)* 180 / np.pi
                         angle = angle if angle>=0 else 360 + angle
-                        outcome.append((str(distance), str(angle)))
+                        angle = round(angle,3)
+                        outcome.append((distance, angle))
                         start_point= direction_point
              path_number+=1 
         return outcome
@@ -149,7 +153,9 @@ class PathFinder():
                 #print((angle+np.pi/2)* 180 / np.pi)
                 angle = (angle+np.pi/2)* 180 / np.pi
                 angle = angle if angle>=0 else 360 + angle
-                outcome.append((str(distance), str(angle)))
+                angle = round(angle, 3)
+                #priprint(angle)
+                outcome.append((distance, angle))
                 start_point= direction_point
             path_number+=1 
         #print(direction_point)

@@ -51,10 +51,11 @@ import shapedetector
 import configureSystem
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
 import json
+import  AWSIoTPythonSDK.MQTTLib as p
 
 import PathFinder
 
-DRAW_OBS = False
+DRAW_OBS = True
 
 FIELD_METER = 1.30
 
@@ -63,7 +64,7 @@ ROOM_OVER_OBSTACLE = 30
 HEIGHT_OBSTACLE = 90.0
 WIDTH_OBSTACLE = 42
 DEBUG = True
-OPTIMIZE = True
+OPTIMIZE = False
 #*** SYSTEM CONFIGURATION
 #-----------------------------------------------------------------
 myScenarioConfig=configureSystem.configureScenario() #use this object to apply the configurations 
@@ -78,7 +79,9 @@ clientId = myAWSConfig.get_thing_name()
 topic_rover = myAWSConfig.get_topic("rover")
 topic_targer = myAWSConfig.get_topic("target")
 useWebsocket=myAWSConfig.useWebsocket
-											 
+def __get_ordered_list(points, x, y, reverse = False):
+        points.sort(key = lambda p: (p[1] - x)**2 + (p[0] - y)**2, reverse = reverse)
+        return points										 
 
 def connect_aws():
 
@@ -108,6 +111,7 @@ def connect_aws():
 		myAWSIoTMQTTClient.configureCredentials(rootCAPath, privateKeyPath, certificatePath)
 
 	# AWSIoTMQTTClient connection configuration
+	#myAWSIoTMQTTClient.configureOfflinePublishQueueing(20, p.DROP_OLDEST)
 	myAWSIoTMQTTClient.configureAutoReconnectBackoffTime(1, 32, 20)
 	myAWSIoTMQTTClient.configureOfflinePublishQueueing(-1)  # Infinite offline Publish queueing
 	myAWSIoTMQTTClient.configureDrainingFrequency(2)  # Draining: 2 Hz
@@ -189,9 +193,9 @@ if __name__ == "__main__":
 	outcomes, db_points = solver.determine_rover_commands()
 	
 	#Do we want to optimaze the path?
-	if(OPTIMIZE):
-		p=solver.optimize_path(dict_maze, db_points.copy(), solver.start,solver.end_points.copy())
-		new_outcomes = solver.optimize_commands(p)
+	#if(OPTIMIZE):
+#		p=solver.optimize_path(dict_maze, db_points.copy(), solver.start,solver.end_points.copy())
+	#	new_outcomes = solver.optimize_commands(p)
 
 	if(DEBUG):
 		image2 = image_scenario.copy()
@@ -202,18 +206,18 @@ if __name__ == "__main__":
 			for point in db_points[path]:
 				image2 = cv2.line(image2, start[::-1],point[::-1], (0, 0, 255), 4)
 				start = point
-		if(OPTIMIZE):
-			image3 = image_scenario.copy()
-			#for outcome in new_outcomes:
-			print(new_outcomes)
-			start = solver.start
-			for path in p:
-				for point in p[path]:
-					image3 = cv2.line(image3, start[::-1],point[::-1], (0, 0, 255), 4)
-					start = point
+		#if(OPTIMIZE):
+		#	image3 = image_scenario.copy()
+		#	#for outcome in new_outcomes:
+		#	print(new_outcomes)
+		#	start = solver.start
+		#	for path in p:
+		#		for point in p[path]:
+		#			image3 = cv2.line(image3, start[::-1],point[::-1], (0, 0, 255), 4)
+		#			start = point
 			
 		cv2.imshow("Test",image2)
-		cv2.imshow("Optimized path",image3)
+		#cv2.imshow("Optimized path",image3)
 		cv2.waitKey(0)
 		cv2.destroyAllWindows()
 
@@ -246,8 +250,10 @@ if __name__ == "__main__":
 	myStart= drawScenario.StartPoint() #creates an object of the class StartPoint	
 	border_list_default=[(20,10),(120,10),(120,120),(20,120)]	#default value for the border coordinates (just in case)
 	current_target_coordinate=None #Init the target coordinate
-	
+	#print(targets_scenario)
+	#targets_scenario = __get_ordered_list(targets_scenario,start_point[0][1],start_point[0][0],True)
 	myTargets.set_target_list(targets_scenario,game_mode) #formats the target list to determine which one will be shown
+	#print(targets_scenario)
 	border_list=[] #init the variable where we will put the points of the border markers
 	# iterate until we find all the border markers
 	while len(border_list)!= len(myScenarioConfig.get_border_ids()):
@@ -270,7 +276,7 @@ if __name__ == "__main__":
 			print ("not all borders detected:",my_markers)
 			
 		time.sleep(0.2)
-	
+	start_time=time.time()
 #once we detected the working area, display the scenario and start game	
 	continue_game=True
 	while(True):
@@ -298,7 +304,7 @@ if __name__ == "__main__":
 																			#in its equivalent position in the rectified ROI 																
 		if targets_scenario:
 			warped,target_list, current_target_coordinate =myTargets.draw_current_target(warped) #draws the obstacle from the image scenario
-					
+			targets_scenario = __get_ordered_list(targets_scenario,start_point[0][1],start_point[0][0],True)	
 			if my_rover_coordinates:
 				try:
 					continue_game=myTargets.check_caught(target_list, my_rover_coordinates[int(rover_id)][0]) 
@@ -313,49 +319,61 @@ if __name__ == "__main__":
 		#		start = point
 		new_t = []
 		for target in target_list:
-			#if(target[1]):
+			if(target[1]):
 				new_t.append(target[0][::-1])
 		print( my_rover_coordinates)
+		
 		final_path = []
 		if(True):
-			try:		
+			try:	
 				dict_maze[1] = maze
-				dict_maze[2] = my_rover_coordinates[int(rover_id)][0]
-				#dict_maze[3] = new_t
+				dict_maze[2] = my_rover_coordinates[int(rover_id)][0][::-1]
+				dict_maze[3] = new_t
 				dict_maze[4] = obstacles_scenario
 				dict_maze[5] = orientations
 				solver = PathFinder.PathFinder(maze.tolist(),dict_maze[2],dict_maze[3].copy(),dict_maze[4])
+				
 				outcomes, db_points = solver.determine_rover_commands()
-
-				if(OPTIMIZE):
+				print("uff")
+			
+				if(OPTIMIZE and (my_rover_coordinates[int(rover_id)][0][0] > 30 or my_rover_coordinates[int(rover_id)][0][0] < 400)) and ((my_rover_coordinates[int(rover_id)][0][1] > 30 or my_rover_coordinates[int(rover_id)][0][1] < 400)):
 					db_points=solver.optimize_path(dict_maze, db_points.copy(), dict_maze[2],dict_maze[3])
-					outcomes = solver.optimize_commands(p)
-				start = my_rover_coordinates[int(rover_id)][0]
+					outcomes = solver.optimize_commands(db_points)
+				start = my_rover_coordinates[int(rover_id)][0][::-1]
 				for path in db_points:
 					for point in db_points[path]:
 						image2 = cv2.line(warped, start[::-1],point[::-1], (0, 0, 0), 4)
 						start = point
-				
-				final_path = [(0,abs(270-my_rover_coordinates[int(rover_id)][1]))]
+				angle = 270-my_rover_coordinates[int(rover_id)][1]
+				if(angle <0):
+					angle = 360 + angle
+				final_path = [(0,angle)]
 				final_path += outcomes
-				print(p)
+				#print(p)
+				print(final_path)
 			except Exception as e:
 				print(e)
+				#mes_rover = json.dumps({'outcome': '{}'.format([(0,0),(0,0)])})
+				#myAWSIoTMQTTClient.publish(topic_rover, mes_rover, 1)
 				pass
 
 		cv2.imshow("Rectified", warped) #uncomment
-		
-		if connect_to_aws:
-			#myAWSIoTMQTTClient.publish(topic_rover, "test", 1)
-			mes_rover = json.dumps({'outcome': '{}'.format(final_path)})		
-			myAWSIoTMQTTClient.publish(topic_rover, mes_rover, 1)	
+		end=time.time()
+		if(end-start_time >0.4):
+			if connect_to_aws:
+				start_time=end;
+				#myAWSIoTMQTTClient.publish(topic_rover, "test", 1)
+				mes_rover = json.dumps({'outcome': '{}'.format(final_path)})		
+				myAWSIoTMQTTClient.publish(topic_rover, mes_rover, 1)
+
+				
 			#mes_target = json.dumps({'target': '{}'.format(current_target_coordinate)})		
 			#myAWSIoTMQTTClient.publish(topic_targer, mes_target, 1)	
 			#print("publishing")
 		
-		end=time.time()
+		#end=time.time()
 		#print (end-start )
-		time.sleep(0.03)
+		#time.sleep(0.1)
 		
 
 
@@ -363,6 +381,8 @@ if __name__ == "__main__":
 			break
 		if not continue_game:
 			print ("All targets caught...")
+			mes_rover = json.dumps({'outcome': '{}'.format([(0,0),(0,0)])})
+			myAWSIoTMQTTClient.publish(topic_rover, mes_rover, 1)
 			time.sleep (2)
 			break
 	cap.release()
